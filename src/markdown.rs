@@ -35,7 +35,7 @@ pub fn generate_markdown(books: &[Book], done: &HashSet<u64>) -> String {
         out.push('\n');
 
         for h in highlights {
-            out.push_str(&format!("- [ ] {} <!-- rw:{} -->\n", h.text.trim(), h.id));
+            out.push_str(&format!("- [ ] {}\n  <!-- rw:{} -->\n", h.text.trim(), h.id));
         }
     }
 
@@ -44,14 +44,26 @@ pub fn generate_markdown(books: &[Book], done: &HashSet<u64>) -> String {
 
 pub fn parse_done_ids(markdown: &str) -> HashSet<u64> {
     let mut ids = HashSet::new();
-    for line in markdown.lines() {
-        let trimmed = line.trim_start();
-        if !trimmed.starts_with("- [x]") && !trimmed.starts_with("- [X]") {
-            continue;
+    let lines: Vec<&str> = markdown.lines().collect();
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim_start();
+        if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
+            // Scan this line and subsequent continuation lines for the rw ID
+            for j in i..lines.len() {
+                if j > i {
+                    let t = lines[j].trim_start();
+                    if t.starts_with("- [") || t.starts_with("## ") {
+                        break;
+                    }
+                }
+                if let Some(id) = extract_rw_id(lines[j]) {
+                    ids.insert(id);
+                    break;
+                }
+            }
         }
-        if let Some(id) = extract_rw_id(line) {
-            ids.insert(id);
-        }
+        i += 1;
     }
     ids
 }
@@ -62,4 +74,56 @@ fn extract_rw_id(line: &str) -> Option<u64> {
     let rest = &line[start..];
     let end = rest.find(" -->")?;
     rest[..end].parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_done_multiline_highlight() {
+        let md = r#"# Readwise Review
+3 highlights (0 reviewed)
+
+## Some Book
+*Some Author*
+
+- [x] What if self-help is similar?
+
+  Obsessing over the self never provides peace.
+  <!-- rw:111 -->
+- [ ] Short one
+  <!-- rw:222 -->
+- [x] Another checked
+  <!-- rw:333 -->
+"#;
+        let done = parse_done_ids(md);
+        assert!(done.contains(&111));
+        assert!(!done.contains(&222));
+        assert!(done.contains(&333));
+        assert_eq!(done.len(), 2);
+    }
+
+    #[test]
+    fn generate_puts_id_after_text() {
+        let books = vec![Book {
+            user_book_id: 1,
+            title: "Test".to_string(),
+            author: Some("Author".to_string()),
+            category: None,
+            highlights: vec![Highlight {
+                id: 42,
+                text: "Line one\n\nLine two".to_string(),
+                note: None,
+                highlighted_at: None,
+                url: None,
+                tags: vec![],
+                book_id: 1,
+                is_deleted: None,
+            }],
+        }];
+        let md = generate_markdown(&books, &HashSet::new());
+        assert!(md.contains("- [ ] Line one\n"));
+        assert!(md.contains("<!-- rw:42 -->"));
+    }
 }
