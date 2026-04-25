@@ -2,22 +2,30 @@ use crate::model::{Book, Highlight};
 use std::collections::HashSet;
 
 pub fn generate_markdown(books: &[Book], done: &HashSet<u64>) -> String {
-    let mut out = String::from("# Readwise Review\n");
-    let mut has_highlights = false;
+    let filtered: Vec<(&Book, Vec<&Highlight>)> = books
+        .iter()
+        .filter_map(|book| {
+            let hl: Vec<&Highlight> = book
+                .highlights
+                .iter()
+                .filter(|h| !done.contains(&h.id))
+                .filter(|h| !h.is_deleted.unwrap_or(false))
+                .collect();
+            if hl.is_empty() { None } else { Some((book, hl)) }
+        })
+        .collect();
 
-    for book in books {
-        let highlights: Vec<&Highlight> = book
-            .highlights
-            .iter()
-            .filter(|h| !done.contains(&h.id))
-            .filter(|h| !h.is_deleted.unwrap_or(false))
-            .collect();
+    let total: usize = filtered.iter().map(|(_, hl)| hl.len()).sum();
+    let all: usize = books.iter().map(|b| b.highlights.len()).sum();
+    let reviewed = all - total;
 
-        if highlights.is_empty() {
-            continue;
-        }
+    if total == 0 {
+        return format!("# Readwise Review\n\nNo new highlights to review. ({reviewed} reviewed)\n");
+    }
 
-        has_highlights = true;
+    let mut out = format!("# Readwise Review\n{total} highlights ({reviewed} reviewed)\n");
+
+    for (book, highlights) in &filtered {
         out.push_str(&format!("\n## {}\n", book.title));
         if let Some(ref author) = book.author {
             if !author.is_empty() {
@@ -26,13 +34,9 @@ pub fn generate_markdown(books: &[Book], done: &HashSet<u64>) -> String {
         }
         out.push('\n');
 
-        for h in &highlights {
+        for h in highlights {
             out.push_str(&format!("- [ ] {} <!-- rw:{} -->\n", h.text.trim(), h.id));
         }
-    }
-
-    if !has_highlights {
-        out.push_str("\nNo new highlights to review.\n");
     }
 
     out

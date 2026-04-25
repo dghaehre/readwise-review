@@ -1,6 +1,6 @@
 # Readwise review
 
-A lightweight tool that uses Readwise's export API to review highlights in Neovim.
+Review Readwise highligts in neovim, fast and easy.
 
 ## How it works
 
