@@ -14,9 +14,10 @@ pub fn fetch_all_highlights(token: &str, updated_after: Option<&str>) -> Result<
 
     loop {
         let response = fetch_page(&client, token, updated_after, page_cursor.as_deref())?;
+        let next = response.next_cursor_string();
         books.extend(response.results);
 
-        match response.next_page_cursor {
+        match next {
             Some(cursor) => page_cursor = Some(cursor),
             None => break,
         }
