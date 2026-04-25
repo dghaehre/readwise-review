@@ -4,7 +4,6 @@ mod model;
 mod state;
 
 use anyhow::Result;
-use chrono::Utc;
 use std::fs;
 use std::process::Command;
 
@@ -21,7 +20,6 @@ fn main() -> Result<()> {
     });
 
     let mut app_state = state::load_state()?;
-    let sync_time = Utc::now().to_rfc3339();
 
     eprintln!("Fetching highlights from Readwise...");
     let books = api::fetch_all_highlights(&token, app_state.updated_after.as_deref())?;
@@ -30,8 +28,6 @@ fn main() -> Result<()> {
 
     if md.contains("No new highlights to review.") {
         println!("No new highlights to review.");
-        app_state.updated_after = Some(sync_time);
-        state::save_state(&app_state)?;
         return Ok(());
     }
 
@@ -46,11 +42,9 @@ fn main() -> Result<()> {
     let newly_done = markdown::parse_done_ids(&updated_md);
     let count = newly_done.len();
 
-    app_state.done.extend(newly_done);
-    app_state.updated_after = Some(sync_time);
-    state::save_state(&app_state)?;
-
     if count > 0 {
+        app_state.done.extend(newly_done);
+        state::save_state(&app_state)?;
         println!("Marked {count} highlights as reviewed ({} total).", app_state.done.len());
     }
 
