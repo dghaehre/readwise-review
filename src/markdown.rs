@@ -35,7 +35,13 @@ pub fn generate_markdown(books: &[Book], done: &HashSet<u64>) -> String {
         out.push('\n');
 
         for h in highlights {
-            out.push_str(&format!("- [ ] {}\n  <!-- rw:{} -->\n", h.text.trim(), h.id));
+            out.push_str(&format!("- [ ] {}\n", h.text.trim()));
+            if let Some(ref note) = h.note {
+                if !note.is_empty() {
+                    out.push_str(&format!("  **Note:** {}\n", note.trim()));
+                }
+            }
+            out.push_str(&format!("  <!-- rw:{} -->\n", h.id));
         }
     }
 
